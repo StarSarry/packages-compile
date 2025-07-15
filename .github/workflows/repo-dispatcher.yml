@@ -52,6 +52,7 @@ jobs:
           [ "$during" ] || during="1.05"
           durings=`echo "$during*60*60*24" | bc`
           if [[ $(expr $gitdate + ${durings%.*}) -lt $now ]]; then
+            echo "exit"
             exit;
           fi
         gitdate=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].created_at') || true
@@ -64,6 +65,7 @@ jobs:
         --data '{"event_type": "update"}'
         fi
         }
+        echo "will trigger other actions"
           curl \
           -X POST https://api.github.com/repos/${{ github.repository }}/dispatches \
           -H "Accept: application/vnd.github.everest-preview+json" \

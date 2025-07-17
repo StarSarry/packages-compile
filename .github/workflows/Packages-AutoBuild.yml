@@ -354,6 +354,7 @@ jobs:
         REMOTE_HOST: ${{ secrets.SERVER_HOST }}
         REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
         REMOTE_PORT: ${{ secrets.SERVER_PORT }}
+        SCRIPT_BEFORE: mkdir -p /www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/kiddin9
         TARGET: "/www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/kiddin9/"
         SCRIPT_AFTER: |
             bash opkg ${{matrix.target}} &

@@ -1,10 +1,12 @@
 #!/bin/bash
 
 shopt -s extglob
+FEED="${FEED:-kiddin9}"
 rm -rf feeds/kiddin9/{diy,mt-drivers,shortcut-fe,luci-app-mtwifi,base-files,luci-app-package-manager,\
 dnsmasq,firewall*,wifi-scripts,opkg,ppp,curl,luci-app-firewall,\
 nftables,fstools,wireless-regdb,libnftnl,netdata}
-rm -rf feeds/packages/libs/libcups
+# 仅在编译 kiddin9 源时移除官方同名包，避免冲突
+[ "$FEED" = "kiddin9" ] && rm -rf feeds/packages/libs/libcups
 
 curl -sfL https://raw.githubusercontent.com/openwrt/packages/master/lang/golang/golang/Makefile -o feeds/packages/lang/golang/golang/Makefile
 
@@ -13,7 +15,8 @@ do
 	[[ "$(grep "KernelPackage" "$ipk/Makefile")" && ! "$(grep "BuildPackage" "$ipk/Makefile")" ]] && rm -rf $ipk || true
 done
 
-#<<'COMMENT'
+# 仅在编译 kiddin9 源时对 feed 做裁剪，官方源编译保持完整
+if [ "$FEED" = "kiddin9" ]; then
 rm -Rf feeds/luci/{applications,collections,protocols,themes,libs,docs,contrib}
 rm -Rf feeds/luci/modules/!(luci-base)
 rm -Rf feeds/packages/!(lang|libs|devel|utils|net|multimedia)
@@ -25,14 +28,17 @@ rm -Rf feeds/base/package/network/!(services|utils)
 rm -Rf feeds/base/package/network/services/!(ppp)
 rm -Rf feeds/base/package/system/!(opkg|ubus|uci|ca-certificates)
 rm -Rf feeds/base/package/kernel/!(cryptodev-linux)
-#COMMENT
+fi
 
-status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-while [[ "$status" == "in_progress" || "$status" == "queued" ]];do
-echo "wait 5s"
-sleep 5
-status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-done
+# 仅在编译 kiddin9 源时等待下游 CI
+if [ "$FEED" = "kiddin9" ]; then
+  status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+  while [[ "$status" == "in_progress" || "$status" == "queued" ]];do
+    echo "wait 5s"
+    sleep 5
+    status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+  done
+fi
 
 ./scripts/feeds update -a
 ./scripts/feeds install -a -p kiddin9 -f

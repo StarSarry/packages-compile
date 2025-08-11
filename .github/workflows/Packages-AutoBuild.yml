@@ -343,7 +343,8 @@ jobs:
         id: organize
         run: |
           mkdir packages
-          mv -f openwrt/bin/packages/*/*/* packages 2>/dev/null || true
+          # Only collect artifacts from the selected feed
+          mv -f openwrt/bin/packages/*/${FEED}/* packages 2>/dev/null || true
           mv -f openwrt/.config packages/${{matrix.target}}.config || true
           # cp -Rf openwrt/bin/packages/*/packages/python3* packages/
           # cp -Rf openwrt/bin/packages/*/luci/luci-base* packages/ || true

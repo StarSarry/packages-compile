@@ -10,7 +10,7 @@ name: Packages-AutoBuild
 
 on:
   repository_dispatch:
-  # push: 
+  # push:
   #   branches:
   #     - master
   # schedule:
@@ -29,7 +29,7 @@ jobs:
   build:
     if: github.event.repository.owner.id == github.event.sender.id || github.event.sender.id == '119362912'
     runs-on: ubuntu-latest
-    
+
     name: Build ${{matrix.target}}
     strategy:
       fail-fast: false
@@ -93,15 +93,13 @@ jobs:
           echo "date=$(date +'%m/%d_%Y_%H/%M')" >> $GITHUB_ENV
           echo "date2=$(date +'%m/%d %Y')" >> $GITHUB_ENV
           echo "date3=$(date +'%m.%d')" >> $GITHUB_ENV
-          # parse FEED / FPKG early for downstream steps
           action="${{ github.event.action }}"
           FEED="$(echo "$action" | grep -o -E 'feed=(kiddin9|packages|luci|base|telephony|routing)' | cut -d= -f2)"
           [ -z "$FEED" ] && FEED="kiddin9"
-          echo "FEED=$FEED" >> $GITHUB_ENV
           FPKG="$(echo "$action" | sed -e 's/feed=\(kiddin9\|packages\|luci\|base\|telephony\|routing\)//' \
             -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\| [0-9][0-9.]*\| ssh\| noser\| cw\)//g' | sed -e 's/ //g')"
+          echo "FEED=$FEED" >> $GITHUB_ENV
           echo "FPKG=$FPKG" >> $GITHUB_ENV
-          echo "MAX_PKGS=${MAX_PKGS:-30000}" >> $GITHUB_ENV
 
       - name: Clone source code
         run: |
@@ -217,15 +215,6 @@ jobs:
           done
           make defconfig
 
-      - name: Cache downloads (dl)
-        uses: actions/cache@v4
-        with:
-          path: openwrt/dl
-          key: dl-${{ matrix.target }}-${{ env.REPO_BRANCH }}
-          restore-keys: |
-            dl-${{ matrix.target }}-
-            dl-
-
       - name: SSH connection to Actions
         uses: kiddin9/debugger-action@master
         if: contains(github.event.action, 'ssh')
@@ -246,95 +235,81 @@ jobs:
         run: |
           cd openwrt
           : > pkgs.all || true
-          if [ "${FEED}" = "kiddin9" ]; then
-            ls kiddin9.b | grep -E "${FPKG:-.*}" > pkgs.all || true
-          elif [ "${FEED}" = "packages" ]; then
-            grep -R "^define Package/" feeds/packages -n | sed -E 's@.*define Package/@@' | cut -d/ -f1 | sort -u | grep -E "${FPKG:-.*}" > pkgs.all || true
-          elif [ "${FEED}" = "luci" ]; then
-            grep -R "^define Package/" feeds/luci -n | sed -E 's@.*define Package/@@' | cut -d/ -f1 | sort -u | grep -E "${FPKG:-.*}" > pkgs.all || true
-          elif [ "${FEED}" = "base" ]; then
-            grep -R "^define Package/" feeds/base -n | sed -E 's@.*define Package/@@' | cut -d/ -f1 | sort -u | grep -E "${FPKG:-.*}" > pkgs.all || true
-          elif [ "${FEED}" = "routing" ]; then
-            grep -R "^define Package/" feeds/routing -n | sed -E 's@.*define Package/@@' | cut -d/ -f1 | sort -u | grep -E "${FPKG:-.*}" > pkgs.all || true
-          elif [ "${FEED}" = "telephony" ]; then
-            grep -R "^define Package/" feeds/telephony -n | sed -E 's@.*define Package/@@' | cut -d/ -f1 | sort -u | grep -E "${FPKG:-.*}" > pkgs.all || true
-          else
-            : > pkgs.all
-          fi
-          # 如果没有指定 FPKG，则按最近 N 天筛选（默认 1.05 天），官方源同样生效
-          during="$(echo "${{github.event.action}}" | grep -o -E ' [0-9][0-9.]*' | sed -e 's/ //')"
-          if [ ! -s pkgs.all ] && [ -z "${FPKG}" ]; then
+          case "${FEED}" in
+            kiddin9)
+              ls kiddin9.b | grep -E "${FPKG:-.*}" > pkgs.all || true ;;
+            packages|luci|base|routing|telephony)
+              grep -R "^define Package/" feeds/${FEED} -n | sed -E 's@.*define Package/@@' | cut -d/ -f1 | sort -u | grep -E "${FPKG:-.*}" > pkgs.all || true ;;
+            *)
+              : > pkgs.all ;;
+          esac
+          # Rules:
+          # 1) FEED=luci and FPKG empty => pick pkgs updated in last 1.05 days
+          # 2) FPKG='.*' => all pkgs from FEED
+          # 3) FPKG specific name/regex => only those pkgs
+          # 4) Only compile from selected FEED
+          : > pkgs.sel || true
+          if [ ! -s pkgs.all ]; then
             echo "no packages selected"; exit 0; fi
-          if [ -z "${FPKG}" ] || [ -n "$during" ]; then
-            [ "$during" ] || during="1.05"
+          if [ -z "${FPKG}" ] && [ "${FEED}" != "kiddin9" ]; then
+            during="1.05"
             seconds=$(echo "$during*60*60*24" | bc)
             now=$(date -d "$(date)" +%s)
-            : > pkgs.sel || true
             while read -r ipk; do
               [ -n "$ipk" ] || continue
-              # 猜测包所在仓库与路径
-              repo=""; path=""
-              case "$FEED" in
-                kiddin9) repo="StarSarry/kwrt-packages"; path="$ipk" ;;
-                packages) repo="openwrt/packages"; path="$(grep -R "define Package/$ipk$" -n feeds/packages | head -n1 | sed -E 's@^([^:]+)/.*@\1@')" ;;
-                luci) repo="openwrt/luci"; path="$(grep -R "define Package/$ipk$" -n feeds/luci | head -n1 | sed -E 's@^([^:]+)/.*@\1@')" ;;
-                base) repo="openwrt/openwrt"; path="$(grep -R "define Package/$ipk$" -n feeds/base | head -n1 | sed -E 's@^([^:]+)/.*@\1@')" ;;
-                routing) repo="openwrt/routing"; path="$(grep -R "define Package/$ipk$" -n feeds/routing | head -n1 | sed -E 's@^([^:]+)/.*@\1@')" ;;
-                telephony) repo="openwrt/telephony"; path="$(grep -R "define Package/$ipk$" -n feeds/telephony | head -n1 | sed -E 's@^([^:]+)/.*@\1@')" ;;
-              esac
-              [ -z "$repo" ] && continue
-              # 取相对目录在仓库中的路径（去掉前缀 feeds/<feed>/）
-              path="$(echo "$path" | sed -E 's@^feeds/[^/]+/@@')"
-              if [ -z "$path" ]; then continue; fi
-              # 查询最近一次提交时间
-              gitdate="$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/$repo/commits?path=$path&per_page=1" | jq -r '.[0].commit.committer.date')"
-              [ "$gitdate" = "null" ] && continue
-              gitdate=$(date -d "$gitdate" +%s)
-              if [ $((gitdate + ${seconds%.*})) -gt $now ]; then
+              feed_dir="feeds/${FEED}"
+              pkg_path=$(grep -R "define Package/$ipk$" -n "$feed_dir" | head -n1 | sed -E 's@^([^:]+)/.*@\1@')
+              local_path="$(echo "$pkg_path" | sed -E 's@^feeds/[^/]+/@@')"
+              gitdate_ts=$(git -C "$feed_dir" log -1 --format=%ct -- "$local_path" 2>/dev/null || true)
+              [ -n "$gitdate_ts" ] || gitdate_ts=$((now - seconds - 1))
+              if [ $((gitdate_ts + ${seconds%.*})) -gt $now ]; then
                 echo "$ipk" >> pkgs.sel
               fi
             done < pkgs.all
+          elif [ "${FPKG}" = ".*" ]; then
+            cp pkgs.all pkgs.sel
           else
+            # exact or regex match already applied to pkgs.all above
             cp pkgs.all pkgs.sel
           fi
-          head -n ${MAX_PKGS} pkgs.sel > pkgs.sel.limited || true
-          echo "count=$(wc -l < pkgs.sel.limited | tr -d ' ')" >> $GITHUB_OUTPUT
+          cp pkgs.sel pkgs.sel.limited || true
 
       - name: Compile the firmware
         run: |
           cd openwrt
             echo -e "$(($(nproc)+1)) thread compile"
-            fpkg="${FPKG}"
-            echo "FPKG=$fpkg" >> $GITHUB_ENV
-            during="$(echo "${{github.event.action}}" | grep -o -E ' [0-9][0-9.]*' | sed -e 's/ //')"
-            function comp(){
-               echo "compile $ipk"
-               if [ "${FEED}" = "kiddin9" ]; then
-                 cp -rf kiddin9.b/$ipk package/feeds/kiddin9/
-                 if [[ $ipk != luci-* ]]; then
-                  mv -f feeds/packages.b feeds/packages
-                  mv feeds/packages/lang.b feeds/packages/lang
-                  [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
-                 fi
-                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
-                 if [[ $ipk != luci-* ]]; then
-                  mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
-                  mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
-                  mv -f feeds/packages feeds/packages.b
-                  rm -rf package/feeds/kiddin9/$ipk
-                 fi
-               else
-                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+            function comp_kiddin9(){
+               echo "compile $ipk (kiddin9)"
+               cp -rf kiddin9.b/$ipk package/feeds/kiddin9/
+               if [[ $ipk != luci-* ]]; then
+                 mv -f feeds/packages.b feeds/packages
+                 mv -f feeds/packages/lang.b feeds/packages/lang
+                 [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
                fi
-              }
-            # 根据上一阶段生成的 pkgs.sel.limited 编译，控制单次数量
+               (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log) || true
+               if [[ $ipk != luci-* ]]; then
+                 mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
+                 mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
+                 mv -f feeds/packages feeds/packages.b
+                 rm -rf package/feeds/kiddin9/$ipk
+               fi
+            }
+            function comp_official(){
+               echo "compile $ipk (${FEED})"
+               (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log) || true
+            }
             if [ -f pkgs.sel.limited ]; then
               while read -r ipk; do
+                [ -n "$ipk" ] || continue
                 echo $ipk
-                comp
+                if [ "${FEED}" = "kiddin9" ]; then
+                  comp_kiddin9
+                else
+                  comp_official
+                fi
               done < pkgs.sel.limited
             fi
-          echo "status=success" >> $GITHUB_ENV
+            echo "status=success" >> $GITHUB_ENV
 
       - name: Check space usage
         run: df -hT

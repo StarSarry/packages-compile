@@ -97,9 +97,10 @@ jobs:
           FEED="$(echo "$action" | grep -o -E 'feed=(kiddin9|packages|luci|base|telephony|routing)' | cut -d= -f2)"
           [ -z "$FEED" ] && FEED="kiddin9"
           FPKG="$(echo "$action" | sed -e 's/feed=\(kiddin9\|packages\|luci\|base\|telephony\|routing\)//' \
-            -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\| [0-9][0-9.]*\| ssh\| noser\| cw\)//g' | sed -e 's/ //g')"
+          -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\| [0-9][0-9.]*\| ssh\| noser\| cw\)//g' | sed -e 's/ //g')"
           echo "FEED=$FEED" >> $GITHUB_ENV
           echo "FPKG=$FPKG" >> $GITHUB_ENV
+          echo "Using feed=$FEED packages filter=$FPKG"
 
       - name: Clone source code
         run: |
@@ -220,96 +221,88 @@ jobs:
         if: contains(github.event.action, 'ssh')
 
       - name: Prepare
+        if: env.FEED == 'kiddin9'
         run: |
           cd openwrt
-          if [ "${FEED}" = "kiddin9" ]; then
-            mv -f package/feeds/kiddin9 kiddin9.b
-            mv -f feeds/packages/lang feeds/packages/lang.b
-            mv -f feeds/packages feeds/packages.b
-            mkdir -p package/feeds/kiddin9
-            cp -rf kiddin9.b/{wxbase,lib*,rapidjson,nftables,jpcre2,toml11,gn,curl,quickjspp,qt*,libdouble*,libtorrent*,openssl,mbedtls,ppp,cups,nftables} package/feeds/kiddin9/ || true
-          fi
-
-      - name: Build package list
-        id: pkgs
-        run: |
-          cd openwrt
-          : > pkgs.all || true
-          case "${FEED}" in
-            kiddin9)
-              ls kiddin9.b | grep -E "${FPKG:-.*}" > pkgs.all || true ;;
-            packages|luci|base|routing|telephony)
-              grep -R "^define Package/" feeds/${FEED} -n | sed -E 's@.*define Package/@@' | cut -d/ -f1 | sort -u | grep -E "${FPKG:-.*}" > pkgs.all || true ;;
-            *)
-              : > pkgs.all ;;
-          esac
-          # Rules:
-          # 1) FEED=luci and FPKG empty => pick pkgs updated in last 1.05 days
-          # 2) FPKG='.*' => all pkgs from FEED
-          # 3) FPKG specific name/regex => only those pkgs
-          # 4) Only compile from selected FEED
-          : > pkgs.sel || true
-          if [ ! -s pkgs.all ]; then
-            echo "no packages selected"; exit 0; fi
-          if [ -z "${FPKG}" ] && [ "${FEED}" != "kiddin9" ]; then
-            during="1.05"
-            seconds=$(echo "$during*60*60*24" | bc)
-            now=$(date -d "$(date)" +%s)
-            while read -r ipk; do
-              [ -n "$ipk" ] || continue
-              feed_dir="feeds/${FEED}"
-              pkg_path=$(grep -R "define Package/$ipk$" -n "$feed_dir" | head -n1 | sed -E 's@^([^:]+)/.*@\1@')
-              local_path="$(echo "$pkg_path" | sed -E 's@^feeds/[^/]+/@@')"
-              gitdate_ts=$(git -C "$feed_dir" log -1 --format=%ct -- "$local_path" 2>/dev/null || true)
-              [ -n "$gitdate_ts" ] || gitdate_ts=$((now - seconds - 1))
-              if [ $((gitdate_ts + ${seconds%.*})) -gt $now ]; then
-                echo "$ipk" >> pkgs.sel
-              fi
-            done < pkgs.all
-          elif [ "${FPKG}" = ".*" ]; then
-            cp pkgs.all pkgs.sel
-          else
-            # exact or regex match already applied to pkgs.all above
-            cp pkgs.all pkgs.sel
-          fi
-          cp pkgs.sel pkgs.sel.limited || true
+          mv -f package/feeds/kiddin9 kiddin9.b
+          mv -f feeds/packages/lang feeds/packages/lang.b
+          mv -f feeds/packages feeds/packages.b
+          mkdir package/feeds/kiddin9
+          cp -rf kiddin9.b/{wxbase,lib*,rapidjson,nftables,jpcre2,toml11,gn,curl,quickjspp,qt*,libdouble*,libtorrent*,openssl,mbedtls,ppp,cups,nftables} package/feeds/kiddin9/ || true
 
       - name: Compile the firmware
         run: |
           cd openwrt
             echo -e "$(($(nproc)+1)) thread compile"
-            function comp_kiddin9(){
-               echo "compile $ipk (kiddin9)"
-               cp -rf kiddin9.b/$ipk package/feeds/kiddin9/
-               if [[ $ipk != luci-* ]]; then
-                 mv -f feeds/packages.b feeds/packages
-                 mv -f feeds/packages/lang.b feeds/packages/lang
-                 [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
-               fi
-               (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log) || true
-               if [[ $ipk != luci-* ]]; then
-                 mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
-                 mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
-                 mv -f feeds/packages feeds/packages.b
-                 rm -rf package/feeds/kiddin9/$ipk
-               fi
-            }
-            function comp_official(){
-               echo "compile $ipk (${FEED})"
-               (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log) || true
-            }
-            if [ -f pkgs.sel.limited ]; then
-              while read -r ipk; do
-                [ -n "$ipk" ] || continue
-                echo $ipk
-                if [ "${FEED}" = "kiddin9" ]; then
-                  comp_kiddin9
-                else
-                  comp_official
-                fi
-              done < pkgs.sel.limited
+            FEED="${{ env.FEED }}"
+            fpkg="${{ env.FPKG }}"
+            during="$(echo "${{github.event.action}}" | grep -o -E ' [0-9][0-9.]*' | sed -e 's/ //')"
+            if [ "$FEED" = "kiddin9" ]; then
+              function comp(){
+                 echo "compile $ipk"
+                 cp -rf kiddin9.b/$ipk package/feeds/kiddin9/
+                 if [[ $ipk != luci-* ]]; then
+                  mv -f feeds/packages.b feeds/packages
+                  mv feeds/packages/lang.b feeds/packages/lang
+                  [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
+                 fi
+                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+                 if [[ $ipk != luci-* ]]; then
+                  mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
+                  mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
+                  mv -f feeds/packages feeds/packages.b
+                  rm -rf package/feeds/kiddin9/$ipk
+                 fi
+                }
+              feed_src_dir="kiddin9.b"
+            else
+              function comp(){
+                 echo "compile $ipk"
+                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+                }
+              feed_src_dir="package/feeds/$FEED"
             fi
-            echo "status=success" >> $GITHUB_ENV
+            if [ -d "$feed_src_dir" ]; then
+              for ipk in $(ls -1 "$feed_src_dir" | grep -E "${fpkg:-.*}"); do
+                echo $ipk
+                if [ "$FEED" = "kiddin9" ]; then
+                  if [[ "$fpkg" && ! "$during" ]]; then
+                    comp
+                  else
+                    REPO_TOKEN="${{ env.REPO_TOKEN }}"
+                    for token in "$REPO_TOKEN" "${{ secrets.TOKEN_KIDDIN9 }}" "${{ secrets.TEMPGITHUBK }}"; do
+                      if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/kiddin9/kwrt-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
+                        success=true
+                        break
+                      fi
+                    done
+                    if [ "$success" != true ]; then
+                        echo "Failed to get commit date with any token"
+                        exit 1
+                    fi
+                    if [[ "$gitdate" && "$gitdate" != null ]]; then
+                      gitdate="$(date -d "$gitdate" +%s)"
+                      now="$(date -d "$(date)" +%s)"
+                      [ "$during" ] || during="1.05"
+                      durings=`echo "$during*60*60*24" | bc`
+                      if [[ $(($gitdate + ${durings%.*})) -gt $now && $ipk != luci-base && $ipk != luci-mod-* ]]; then
+                        echo "$((($now - $gitdate)/60/60))" || true
+                        echo "$ipk" >> ipk.txt
+                      fi
+                    fi
+                  fi
+                else
+                  comp
+                fi
+              done
+            fi
+            if [ "$FEED" = "kiddin9" ] && [ -f ipk.txt ]; then
+                for ipk in $(cat ipk.txt)
+                do
+                  comp
+                done
+            fi
+          echo "status=success" >> $GITHUB_ENV
 
       - name: Check space usage
         run: df -hT
@@ -318,8 +311,7 @@ jobs:
         id: organize
         run: |
           mkdir packages
-          # Only collect artifacts from the selected feed
-          mv -f openwrt/bin/packages/*/${FEED}/* packages 2>/dev/null || true
+          mv -f openwrt/bin/packages/*/${{ env.FEED }}/* packages || true
           mv -f openwrt/.config packages/${{matrix.target}}.config || true
           # cp -Rf openwrt/bin/packages/*/packages/python3* packages/
           # cp -Rf openwrt/bin/packages/*/luci/luci-base* packages/ || true
@@ -387,7 +379,6 @@ jobs:
           REMOTE_HOST: ${{ secrets.SERVER_HOST }}
           REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
           REMOTE_PORT: ${{ secrets.SERVER_PORT }}
-          SCRIPT_BEFORE: mkdir -p /www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/${{ env.FEED }}
           TARGET: "/www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/${{ env.FEED }}/"
           SCRIPT_AFTER: |
             bash opkg ${{matrix.target}} &

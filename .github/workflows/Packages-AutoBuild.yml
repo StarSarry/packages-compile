@@ -302,6 +302,10 @@ jobs:
                   comp
                 done
             fi
+            if [ -f failed.txt ] && grep -q "FAILED:luci-nginx" failed.txt; then
+              echo "luci-nginx failed, running verbose nginx compile for diagnostics..."
+              make package/nginx/compile V=s 2>&1 | tee error_dep_nginx.log || true
+            fi
           echo "status=success" >> $GITHUB_ENV
 
       - name: Check space usage

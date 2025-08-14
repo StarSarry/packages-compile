@@ -189,31 +189,36 @@ jobs:
           cp -rf devices/common/. ./
           cp -rf devices/${{matrix.target}}/. ./
           chmod -R +x devices/* || true
-          sed -i '/	refresh_config();/d' scripts/feeds
-          ./scripts/feeds update -a
-          find "devices/common/patches" -type f -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
-          /bin/bash "devices/common/custom.sh"
-          if [ -f "devices/${{matrix.target}}/custom.sh" ]; then
-            /bin/bash "devices/${{matrix.target}}/custom.sh"
-          fi
-          find "devices/common/patches" -type f -name '*.patch' ! -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
-          if [ -n "$(ls -A "devices/${{matrix.target}}/patches" 2>/dev/null)" ]; then
-            find "devices/${{matrix.target}}/patches" -type f -name '*.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
-          fi
-          cp -Rf ./diy/* ./ || true
-          if [ -f "devices/${{matrix.target}}/default-settings" ]; then
-            echo >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
-            cat devices/${{matrix.target}}/default-settings >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
-          fi
-          if [ -f "devices/${{matrix.target}}/.config" ]; then
-            echo >> .config
-            cat devices/${{matrix.target}}/.config >> .config
-          fi
-          status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-          while [ "$status" == "in_progress" ];do
-            sleep 5
+          FEED="${{ env.FEED }}"
+          if [ "$FEED" = "kiddin9" ]; then
+            sed -i '/	refresh_config();/d' scripts/feeds
+            ./scripts/feeds update -a
+            find "devices/common/patches" -type f -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
+            /bin/bash "devices/common/custom.sh"
+            if [ -f "devices/${{matrix.target}}/custom.sh" ]; then
+              /bin/bash "devices/${{matrix.target}}/custom.sh"
+            fi
+            find "devices/common/patches" -type f -name '*.patch' ! -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
+            if [ -n "$(ls -A "devices/${{matrix.target}}/patches" 2>/dev/null)" ]; then
+              find "devices/${{matrix.target}}/patches" -type f -name '*.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
+            fi
+            cp -Rf ./diy/* ./ || true
+            if [ -f "devices/${{matrix.target}}/default-settings" ]; then
+              echo >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
+              cat devices/${{matrix.target}}/default-settings >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
+            fi
+            if [ -f "devices/${{matrix.target}}/.config" ]; then
+              echo >> .config
+              cat devices/${{matrix.target}}/.config >> .config
+            fi
             status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-          done
+            while [ "$status" == "in_progress" ];do
+              sleep 5
+              status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+            done
+          else
+            ./scripts/feeds update -a
+          fi
           make defconfig
 
       - name: SSH connection to Actions

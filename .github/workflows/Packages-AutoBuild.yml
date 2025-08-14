@@ -237,6 +237,7 @@ jobs:
             FEED="${{ env.FEED }}"
             fpkg="${{ env.FPKG }}"
             during="$(echo "${{github.event.action}}" | grep -o -E ' [0-9][0-9.]*' | sed -e 's/ //')"
+            : > built_pkgs.txt
             if [ "$FEED" = "kiddin9" ]; then
               function comp(){
                  echo "compile $ipk"
@@ -246,7 +247,11 @@ jobs:
                   mv feeds/packages/lang.b feeds/packages/lang
                   [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
                  fi
-                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+                 if ! make -k package/$ipk/compile -j$(($(nproc)+1)); then
+                   make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log || true
+                   echo "FAILED:$ipk" >> failed.txt
+                 fi
+                 echo "$ipk" >> built_pkgs.txt           
                  if [[ $ipk != luci-* ]]; then
                   mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
                   mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
@@ -258,7 +263,11 @@ jobs:
             else
               function comp(){
                  echo "compile $ipk"
-                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+                 if ! make -k package/$ipk/compile -j$(($(nproc)+1)); then
+                   make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log || true
+                   echo "FAILED:$ipk" >> failed.txt
+                 fi
+                 echo "$ipk" >> built_pkgs.txt
                 }
               feed_src_dir="package/feeds/$FEED"
             fi
@@ -315,7 +324,27 @@ jobs:
         id: organize
         run: |
           mkdir packages
-          mv -f openwrt/bin/packages/*/${{ env.FEED }}/* packages || true
+          touch openwrt/built_pkgs.txt
+          [ -f openwrt/built_pkgs.txt ] || true
+          if [ -f openwrt/built_pkgs.txt ]; then
+            echo "built packages:" && cat openwrt/built_pkgs.txt || true
+          fi
+          # Collect only the explicitly built packages
+          if [ -f openwrt/built_pkgs.txt ]; then
+            while IFS= read -r name; do
+              [ -z "$name" ] && continue
+              # luci packages + i18n for luci apps
+              if echo "$name" | grep -q '^luci-'; then
+                find openwrt/bin/packages -type f -name "${name}_*.ipk" -exec mv -f {} packages \; || true
+                app="$(echo "$name" | sed -n 's/^luci-\(app-.*\)$/\1/p')"
+                if [ -n "$app" ]; then
+                  find openwrt/bin/packages -type f -name "luci-i18n-${app}-*.ipk" -exec mv -f {} packages \; || true
+                fi
+              else
+                find openwrt/bin/packages -type f -name "${name}_*.ipk" -exec mv -f {} packages \; || true
+              fi
+            done < openwrt/built_pkgs.txt
+          fi
           mv -f openwrt/.config packages/${{matrix.target}}.config || true
           # cp -Rf openwrt/bin/packages/*/packages/python3* packages/
           # cp -Rf openwrt/bin/packages/*/luci/luci-base* packages/ || true
@@ -394,3 +423,13 @@ jobs:
         with:
           name: ${{ env.date3 }} ${{matrix.target}}
           path: packages
+
+      - name: Upload error logs (always)
+        uses: actions/upload-artifact@main
+        continue-on-error: true
+        with:
+          name: error-logs-${{matrix.target}}
+          path: |
+            openwrt/error*.log
+            openwrt/error_*.log
+            openwrt/error_dep_*.log

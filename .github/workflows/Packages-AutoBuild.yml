@@ -246,7 +246,20 @@ jobs:
                   mv feeds/packages/lang.b feeds/packages/lang
                   [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
                  fi
-                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+                   if make -k package/$ipk/compile -j$(($(nproc)+1)); then
+                     echo "success $ipk"
+                   else
+                     echo "retry with verbose log for $ipk"
+                     make package/$ipk/compile V=s 2>&1 | tee "error_${ipk}.log"
+                     build_code=${PIPESTATUS[0]}
+                     if [ $build_code -ne 0 ]; then
+                       echo "---- Last 200 lines of error_${ipk}.log ----"
+                       tail -n 200 "error_${ipk}.log" || true
+                       echo "$ipk" >> failed.txt
+                     else
+                       rm -f "error_${ipk}.log"
+                     fi
+                   fi
                  if [[ $ipk != luci-* ]]; then
                   mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
                   mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
@@ -258,7 +271,20 @@ jobs:
             else
               function comp(){
                  echo "compile $ipk"
-                 (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+                   if make -k package/$ipk/compile -j$(($(nproc)+1)); then
+                     echo "success $ipk"
+                   else
+                     echo "retry with verbose log for $ipk"
+                     make package/$ipk/compile V=s 2>&1 | tee "error_${ipk}.log"
+                     build_code=${PIPESTATUS[0]}
+                     if [ $build_code -ne 0 ]; then
+                       echo "---- Last 200 lines of error_${ipk}.log ----"
+                       tail -n 200 "error_${ipk}.log" || true
+                       echo "$ipk" >> failed.txt
+                     else
+                       rm -f "error_${ipk}.log"
+                     fi
+                   fi
                 }
               feed_src_dir="package/feeds/$FEED"
             fi
@@ -302,7 +328,21 @@ jobs:
                   comp
                 done
             fi
+             if [ -f failed.txt ]; then
+               echo "Failed packages:"
+               cat failed.txt
+             fi
           echo "status=success" >> $GITHUB_ENV
+
+      - name: Upload error logs
+        uses: actions/upload-artifact@main
+        if: always()
+        with:
+          name: error-logs
+          path: |
+            openwrt/error*.log
+            openwrt/failed.txt
+          if-no-files-found: ignore
 
       - name: Check space usage
         run: df -hT

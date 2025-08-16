@@ -98,9 +98,6 @@ jobs:
           [ -z "$FEED" ] && FEED="kiddin9"
           FPKG="$(echo "$action" | sed -e 's/feed=\(kiddin9\|packages\|luci\|base\|telephony\|routing\)//' \
           -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\| [0-9][0-9.]*\| ssh\| noser\| cw\)//g' | sed -e 's/ //g')"
-          # Support packages=... or package=... or pkg=... (comma-separated supported)
-          PKGLIST="$(echo "$action" | grep -o -E '(packages|package|pkg)=([A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*)' | tail -n1 | cut -d= -f2)"
-          [ -n "$PKGLIST" ] && FPKG="$PKGLIST"
           echo "FEED=$FEED" >> $GITHUB_ENV
           echo "FPKG=$FPKG" >> $GITHUB_ENV
           echo "Using feed=$FEED packages filter=$FPKG"
@@ -193,11 +190,11 @@ jobs:
           cp -rf devices/${{matrix.target}}/. ./
           chmod -R +x devices/* || true
           FEED="${{ env.FEED }}"
+          /bin/bash "devices/common/custom.sh"
           if [ "$FEED" = "kiddin9" ]; then
             sed -i '/	refresh_config();/d' scripts/feeds
             ./scripts/feeds update -a
             find "devices/common/patches" -type f -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
-            /bin/bash "devices/common/custom.sh"
             if [ -f "devices/${{matrix.target}}/custom.sh" ]; then
               /bin/bash "devices/${{matrix.target}}/custom.sh"
             fi
@@ -221,7 +218,6 @@ jobs:
             done
           else
             ./scripts/feeds update -a
-            ./scripts/feeds install -a
           fi
           make defconfig
 
@@ -297,47 +293,39 @@ jobs:
                 }
               feed_src_dir="package/feeds/$FEED"
             fi
-            if [ -n "$fpkg" ]; then
-              # Directly compile requested packages (comma-separated)
-              for ipk in $(echo "$fpkg" | tr ',' ' '); do
-                echo "$ipk"
-                comp
-              done
-            else
-              if [ -d "$feed_src_dir" ]; then
-                for ipk in $(ls -1 "$feed_src_dir"); do
-                  echo $ipk
-                  if [ "$FEED" = "kiddin9" ]; then
-                    if [[ "$fpkg" && ! "$during" ]]; then
-                      comp
-                    else
-                      REPO_TOKEN="${{ env.REPO_TOKEN }}"
-                      for token in "$REPO_TOKEN" "${{ secrets.TOKEN_KIDDIN9 }}" "${{ secrets.TEMPGITHUBK }}"; do
-                        if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/kiddin9/kwrt-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
-                          success=true
-                          break
-                        fi
-                      done
-                      if [ "$success" != true ]; then
-                          echo "Failed to get commit date with any token"
-                          exit 1
+            if [ -d "$feed_src_dir" ]; then
+              for ipk in $(ls -1 "$feed_src_dir" | grep -E "${fpkg:-.*}"); do
+                echo $ipk
+                if [ "$FEED" = "kiddin9" ]; then
+                  if [[ "$fpkg" && ! "$during" ]]; then
+                    comp
+                  else
+                    REPO_TOKEN="${{ env.REPO_TOKEN }}"
+                    for token in "$REPO_TOKEN" "${{ secrets.TOKEN_KIDDIN9 }}" "${{ secrets.TEMPGITHUBK }}"; do
+                      if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/kiddin9/kwrt-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
+                        success=true
+                        break
                       fi
-                      if [[ "$gitdate" && "$gitdate" != null ]]; then
-                        gitdate="$(date -d "$gitdate" +%s)"
-                        now="$(date -d "$(date)" +%s)"
-                        [ "$during" ] || during="1.05"
-                        durings=`echo "$during*60*60*24" | bc`
-                        if [[ $(($gitdate + ${durings%.*})) -gt $now && $ipk != luci-base && $ipk != luci-mod-* ]]; then
-                          echo "$((($now - $gitdate)/60/60))" || true
-                          echo "$ipk" >> ipk.txt
-                        fi
+                    done
+                    if [ "$success" != true ]; then
+                        echo "Failed to get commit date with any token"
+                        exit 1
+                    fi
+                    if [[ "$gitdate" && "$gitdate" != null ]]; then
+                      gitdate="$(date -d "$gitdate" +%s)"
+                      now="$(date -d "$(date)" +%s)"
+                      [ "$during" ] || during="1.05"
+                      durings=`echo "$during*60*60*24" | bc`
+                      if [[ $(($gitdate + ${durings%.*})) -gt $now && $ipk != luci-base && $ipk != luci-mod-* ]]; then
+                        echo "$((($now - $gitdate)/60/60))" || true
+                        echo "$ipk" >> ipk.txt
                       fi
                     fi
-                  else
-                    comp
                   fi
-                done
-              fi
+                else
+                  comp
+                fi
+              done
             fi
             if [ "$FEED" = "kiddin9" ] && [ -f ipk.txt ]; then
                 for ipk in $(cat ipk.txt)

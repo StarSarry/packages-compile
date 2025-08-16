@@ -2,6 +2,15 @@
 
 shopt -s extglob
 FEED="${FEED:-kiddin9}"
+FPKG="${FPKG}"
+
+# 当 packages 为 luci（例如 action: packages=luci 或 FPKG=luci）时禁用 njs
+if echo "${FPKG}" | grep -Eq '(^|,| )luci($|,| )|(^| )packages=luci($| )'; then
+  sed -i '/^CONFIG_PACKAGE_nginx-mod-njs/d' .config 2>/dev/null || true
+  echo "# CONFIG_PACKAGE_nginx-mod-njs is not set" >> .config
+fi
+
+# 以下为 kiddin9 专用定制
 rm -rf feeds/kiddin9/{diy,mt-drivers,shortcut-fe,luci-app-mtwifi,base-files,luci-app-package-manager,\
 dnsmasq,firewall*,wifi-scripts,opkg,ppp,curl,luci-app-firewall,\
 nftables,fstools,wireless-regdb,libnftnl,netdata}
@@ -58,6 +67,12 @@ sed -i \
 	package/feeds/kiddin9/*/Makefile
 
 cp -f devices/common/.config .config
+
+# 若 packages 指定为 luci，则在覆盖 .config 之后再次禁用 njs，确保配置不被上一步覆盖
+if echo "${FPKG}" | grep -Eq '(^|,| )luci($|,| )|(^| )packages=luci($| )'; then
+  sed -i '/^CONFIG_PACKAGE_nginx-mod-njs/d' .config 2>/dev/null || true
+  echo "# CONFIG_PACKAGE_nginx-mod-njs is not set" >> .config
+fi
 
 sed -i '/WARNING: Makefile/d' scripts/package-metadata.pl
 

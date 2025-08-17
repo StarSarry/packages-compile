@@ -4,12 +4,6 @@ shopt -s extglob
 FEED="${FEED:-kiddin9}"
 FPKG="${FPKG}"
 
-# 当 packages 为 luci（例如 action: packages=luci 或 FPKG=luci）时禁用 njs
-if echo "${FPKG}" | grep -Eq '(^|,| )luci($|,| )|(^| )packages=luci($| )'; then
-  sed -i '/^CONFIG_PACKAGE_nginx-mod-njs/d' .config 2>/dev/null || true
-  echo "# CONFIG_PACKAGE_nginx-mod-njs is not set" >> .config
-fi
-
 # 以下为 kiddin9 专用定制
 rm -rf feeds/kiddin9/{diy,mt-drivers,shortcut-fe,luci-app-mtwifi,base-files,luci-app-package-manager,\
 dnsmasq,firewall*,wifi-scripts,opkg,ppp,curl,luci-app-firewall,\
@@ -55,6 +49,12 @@ fi
 
 rm -rf package/feeds/kiddin9/luci-app-quickstart/root/usr/share/luci/menu.d/luci-app-quickstart.json
 
+# 当 packages 包含 luci 或 luci-nginx 时，删除上游失配的 njs 补丁，避免 nginx prepare 阶段失败
+if echo "${FPKG}" | grep -Eq '(^|,| )luci($|,| )|(^|,| )luci-nginx($|,| )'; then
+  rm -f feeds/packages/net/nginx/patches/nginx-mod-njs/104-endianness_fix.patch 2>/dev/null || true
+  rm -f feeds/packages/net/nginx/patches/104-endianness_fix.patch 2>/dev/null || true
+fi
+
 sed -i 's/\(page\|e\)\?.acl_depends.*\?}//' `find package/feeds/kiddin9/luci-*/luasrc/controller/* -name "*.lua"`
 # sed -i 's/\/cgi-bin\/\(luci\|cgi-\)/\/\1/g' `find package/feeds/kiddin9/luci-*/ -name "*.lua" -or -name "*.htm*" -or -name "*.js"` &
 
@@ -67,12 +67,6 @@ sed -i \
 	package/feeds/kiddin9/*/Makefile
 
 cp -f devices/common/.config .config
-
-# 若 packages 指定为 luci，则在覆盖 .config 之后再次禁用 njs，确保配置不被上一步覆盖
-if echo "${FPKG}" | grep -Eq '(^|,| )luci($|,| )|(^| )packages=luci($| )'; then
-  sed -i '/^CONFIG_PACKAGE_nginx-mod-njs/d' .config 2>/dev/null || true
-  echo "# CONFIG_PACKAGE_nginx-mod-njs is not set" >> .config
-fi
 
 sed -i '/WARNING: Makefile/d' scripts/package-metadata.pl
 

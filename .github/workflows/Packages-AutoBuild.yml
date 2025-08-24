@@ -79,10 +79,10 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install build-essential clang flex bison g++ libncurses-dev zlib1g-dev gawk git \
-          gcc-multilib g++-multilib gettext libncurses5-dev libssl-dev xsltproc rsync wget unzip \
-          llvm python3-setuptools swig file python3-pyelftools libpython3-dev aria2 jq qemu-utils rename \
-          libelf-dev libgmp3-dev libmpc-dev libfuse-dev bc autopoint cups-ppdc ccache device-tree-compiler  
+          sudo -E apt-get -qq install build-essential libncurses-dev zlib1g-dev gawk git \
+          gettext libssl-dev xsltproc rsync wget unzip \
+          llvm python3-pyelftools libpython3-dev aria2 jq qemu-utils rename \
+          libelf-dev libgmp3-dev libmpc-dev libfuse-dev bc autopoint cups-ppdc
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "Asia/Shanghai"
@@ -93,14 +93,6 @@ jobs:
           echo "date=$(date +'%m/%d_%Y_%H/%M')" >> $GITHUB_ENV
           echo "date2=$(date +'%m/%d %Y')" >> $GITHUB_ENV
           echo "date3=$(date +'%m.%d')" >> $GITHUB_ENV
-          action="${{ github.event.action }}"
-          FEED="$(echo "$action" | grep -o -E 'feed=(kiddin9|packages|luci|base|telephony|routing)' | cut -d= -f2)"
-          [ -z "$FEED" ] && FEED="kiddin9"
-          FPKG="$(echo "$action" | sed -e 's/feed=\(kiddin9\|packages\|luci\|base\|telephony\|routing\)//' \
-          -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\| [0-9][0-9.]*\| ssh\| noser\| cw\)//g' | sed -e 's/ //g')"
-          echo "FEED=$FEED" >> $GITHUB_ENV
-          echo "FPKG=$FPKG" >> $GITHUB_ENV
-          echo "Using feed=$FEED packages filter=$FPKG"
 
       - name: Clone source code
         run: |
@@ -189,36 +181,31 @@ jobs:
           cp -rf devices/common/. ./
           cp -rf devices/${{matrix.target}}/. ./
           chmod -R +x devices/* || true
-          FEED="${{ env.FEED }}"
+          sed -i '/	refresh_config();/d' scripts/feeds
+          ./scripts/feeds update -a
+          find "devices/common/patches" -type f -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
           /bin/bash "devices/common/custom.sh"
-          if [ "$FEED" = "kiddin9" ]; then
-            sed -i '/	refresh_config();/d' scripts/feeds
-            ./scripts/feeds update -a
-            find "devices/common/patches" -type f -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
-            if [ -f "devices/${{matrix.target}}/custom.sh" ]; then
-              /bin/bash "devices/${{matrix.target}}/custom.sh"
-            fi
-            find "devices/common/patches" -type f -name '*.patch' ! -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
-            if [ -n "$(ls -A "devices/${{matrix.target}}/patches" 2>/dev/null)" ]; then
-              find "devices/${{matrix.target}}/patches" -type f -name '*.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
-            fi
-            cp -Rf ./diy/* ./ || true
-            if [ -f "devices/${{matrix.target}}/default-settings" ]; then
-              echo >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
-              cat devices/${{matrix.target}}/default-settings >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
-            fi
-            if [ -f "devices/${{matrix.target}}/.config" ]; then
-              echo >> .config
-              cat devices/${{matrix.target}}/.config >> .config
-            fi
-            status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-            while [ "$status" == "in_progress" ];do
-              sleep 5
-              status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-            done
-          else
-            ./scripts/feeds update -a
+          if [ -f "devices/${{matrix.target}}/custom.sh" ]; then
+            /bin/bash "devices/${{matrix.target}}/custom.sh"
           fi
+          find "devices/common/patches" -type f -name '*.patch' ! -name '*.b.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
+          if [ -n "$(ls -A "devices/${{matrix.target}}/patches" 2>/dev/null)" ]; then
+            find "devices/${{matrix.target}}/patches" -type f -name '*.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
+          fi
+          cp -Rf ./diy/* ./ || true
+          if [ -f "devices/${{matrix.target}}/default-settings" ]; then
+            echo >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
+            cat devices/${{matrix.target}}/default-settings >> package/*/*/my-default-settings/files/etc/uci-defaults/99-default-settings
+          fi
+          if [ -f "devices/${{matrix.target}}/.config" ]; then
+            echo >> .config
+            cat devices/${{matrix.target}}/.config >> .config
+          fi
+          status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+          while [ "$status" == "in_progress" ];do
+            sleep 5
+            status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+          done
           make defconfig
 
       - name: SSH connection to Actions
@@ -226,7 +213,6 @@ jobs:
         if: contains(github.event.action, 'ssh')
 
       - name: Prepare
-        if: env.FEED == 'kiddin9'
         run: |
           cd openwrt
           mv -f package/feeds/kiddin9 kiddin9.b
@@ -239,115 +225,60 @@ jobs:
         run: |
           cd openwrt
             echo -e "$(($(nproc)+1)) thread compile"
-            FEED="${{ env.FEED }}"
-            fpkg="${{ env.FPKG }}"
+            fpkg="$(echo "${{github.event.action}}" | sed -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\| [0-9][0-9.]*\| ssh\| noser\| cw\)//g' | sed -e 's/ //g')"
+            echo "FPKG=$fpkg" >> $GITHUB_ENV
             during="$(echo "${{github.event.action}}" | grep -o -E ' [0-9][0-9.]*' | sed -e 's/ //')"
-            if [ "$FEED" = "kiddin9" ]; then
-              function comp(){
-                 echo "compile $ipk"
-                 cp -rf kiddin9.b/$ipk package/feeds/kiddin9/
-                 if [[ $ipk != luci-* ]]; then
-                  mv -f feeds/packages.b feeds/packages
-                  mv feeds/packages/lang.b feeds/packages/lang
-                  [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
-                 fi
-                   if make -k package/$ipk/compile -j$(($(nproc)+1)); then
-                     echo "success $ipk"
-                   else
-                     echo "retry with verbose log for $ipk"
-                     make package/$ipk/compile V=s 2>&1 | tee "error_${ipk}.log"
-                     build_code=${PIPESTATUS[0]}
-                     if [ $build_code -ne 0 ]; then
-                       echo "---- Last 200 lines of error_${ipk}.log ----"
-                       tail -n 200 "error_${ipk}.log" || true
-                       echo "$ipk" >> failed.txt
-                     else
-                       rm -f "error_${ipk}.log"
-                     fi
-                   fi
-                 if [[ $ipk != luci-* ]]; then
-                  mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
-                  mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
-                  mv -f feeds/packages feeds/packages.b
-                  rm -rf package/feeds/kiddin9/$ipk
-                 fi
-                }
-              feed_src_dir="kiddin9.b"
-            else
-              function comp(){
-                 echo "compile $ipk"
-                   if make -k package/$ipk/compile -j$(($(nproc)+1)); then
-                     echo "success $ipk"
-                   else
-                     echo "retry with verbose log for $ipk"
-                     make package/$ipk/compile V=s 2>&1 | tee "error_${ipk}.log"
-                     build_code=${PIPESTATUS[0]}
-                     if [ $build_code -ne 0 ]; then
-                       echo "---- Last 200 lines of error_${ipk}.log ----"
-                       tail -n 200 "error_${ipk}.log" || true
-                       echo "$ipk" >> failed.txt
-                     else
-                       rm -f "error_${ipk}.log"
-                     fi
-                   fi
-                }
-              feed_src_dir="package/feeds/$FEED"
-            fi
-            if [ -d "$feed_src_dir" ]; then
-              for ipk in $(ls -1 "$feed_src_dir" | grep -E "${fpkg:-.*}"); do
-                echo $ipk
-                if [ "$FEED" = "kiddin9" ]; then
-                  if [[ "$fpkg" && ! "$during" ]]; then
-                    comp
-                  else
-                    REPO_TOKEN="${{ env.REPO_TOKEN }}"
-                    for token in "$REPO_TOKEN" "${{ secrets.TOKEN_KIDDIN9 }}" "${{ secrets.TEMPGITHUBK }}"; do
-                      if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/kiddin9/kwrt-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
-                        success=true
-                        break
-                      fi
-                    done
-                    if [ "$success" != true ]; then
-                        echo "Failed to get commit date with any token"
-                        exit 1
-                    fi
-                    if [[ "$gitdate" && "$gitdate" != null ]]; then
-                      gitdate="$(date -d "$gitdate" +%s)"
-                      now="$(date -d "$(date)" +%s)"
-                      [ "$during" ] || during="1.05"
-                      durings=`echo "$during*60*60*24" | bc`
-                      if [[ $(($gitdate + ${durings%.*})) -gt $now && $ipk != luci-base && $ipk != luci-mod-* ]]; then
-                        echo "$((($now - $gitdate)/60/60))" || true
-                        echo "$ipk" >> ipk.txt
-                      fi
-                    fi
+            function comp(){
+               echo "compile $ipk"
+               cp -rf kiddin9.b/$ipk package/feeds/kiddin9/
+               if [[ $ipk != luci-* ]]; then
+                mv -f feeds/packages.b feeds/packages
+                mv feeds/packages/lang.b feeds/packages/lang
+                [ "$(grep "PKG_BUILD_DEPENDS" package/feeds/kiddin9/$ipk/Makefile)" ] || mv feeds/packages/lang/node feeds/packages/lang/node.b
+               fi
+               (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+               if [[ $ipk != luci-* ]]; then
+                mv -f feeds/packages/lang feeds/packages/lang.b 2>/dev/null || true
+                mv -f feeds/packages/lang.b/node.b feeds/packages/lang.b/node 2>/dev/null || true
+                mv -f feeds/packages feeds/packages.b
+                rm -rf package/feeds/kiddin9/$ipk
+               fi
+              }
+            for ipk in $(ls kiddin9.b | grep -E "$fpkg"); do
+              echo $ipk
+              if [[ "$fpkg" && ! "$during" ]]; then
+                comp
+              else
+                REPO_TOKEN="${{ env.REPO_TOKEN }}"
+                for token in "$REPO_TOKEN" "${{ secrets.TOKEN_KIDDIN9 }}" "${{ secrets.TEMPGITHUBK }}"; do
+                  if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/StarSarry/kwrt-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
+                    success=true
+                    break
                   fi
-                else
-                  comp
+                done
+                if [ "$success" != true ]; then
+                    echo "Failed to get commit date with any token"
+                    exit 1
                 fi
-              done
-            fi
-            if [ "$FEED" = "kiddin9" ] && [ -f ipk.txt ]; then
+                if [[ "$gitdate" && "$gitdate" != null ]]; then
+                  gitdate="$(date -d "$gitdate" +%s)"
+                  now="$(date -d "$(date)" +%s)"
+                  [ "$during" ] || during="1.05"
+                  durings=`echo "$during*60*60*24" | bc`
+                  if [[ $(($gitdate + ${durings%.*})) -gt $now && $ipk != luci-base && $ipk != luci-mod-* ]]; then
+                    echo "$((($now - $gitdate)/60/60))" || true
+                    echo "$ipk" >> ipk.txt
+                  fi
+                fi
+              fi
+            done
+            if [ -f ipk.txt ]; then
                 for ipk in $(cat ipk.txt)
                 do
                   comp
                 done
             fi
-             if [ -f failed.txt ]; then
-               echo "Failed packages:"
-               cat failed.txt
-             fi
           echo "status=success" >> $GITHUB_ENV
-
-      - name: Upload error logs
-        uses: actions/upload-artifact@main
-        if: always()
-        with:
-          name: error-logs
-          path: |
-            openwrt/error*.log
-            openwrt/failed.txt
-          if-no-files-found: ignore
 
       - name: Check space usage
         run: df -hT
@@ -356,7 +287,7 @@ jobs:
         id: organize
         run: |
           mkdir packages
-          mv -f openwrt/bin/packages/*/${{ env.FEED }}/* packages || true
+          mv -f openwrt/bin/packages/*/kiddin9/* packages || true
           mv -f openwrt/.config packages/${{matrix.target}}.config || true
           # cp -Rf openwrt/bin/packages/*/packages/python3* packages/
           # cp -Rf openwrt/bin/packages/*/luci/luci-base* packages/ || true
@@ -424,7 +355,8 @@ jobs:
           REMOTE_HOST: ${{ secrets.SERVER_HOST }}
           REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
           REMOTE_PORT: ${{ secrets.SERVER_PORT }}
-          TARGET: "/www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/${{ env.FEED }}/"
+          SCRIPT_BEFORE: mkdir -p /www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/kiddin9
+          TARGET: "/www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/kiddin9/"
           SCRIPT_AFTER: |
             bash opkg ${{matrix.target}} &
 

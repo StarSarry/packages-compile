@@ -14,6 +14,7 @@ cp -f devices/common/.config .config
 
 sed -i '/WARNING: Makefile/d' scripts/package-metadata.pl
 
+sed -i "s#false; \\\#true; \\\#" include/download.mk
 
 cp -f devices/common/po2lmo staging_dir/host/bin/po2lmo
 chmod +x staging_dir/host/bin/po2lmo

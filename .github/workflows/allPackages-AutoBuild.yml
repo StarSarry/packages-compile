@@ -199,6 +199,7 @@ jobs:
       uses: shaowenchen/debugger-action@main
       if: contains(github.event.inputs.packages, 'ssh')
       timeout-minutes: 60
+      continue-on-error: true
       with:
           ngrok_token: ${{ secrets.NGROK_TOKEN }}
 

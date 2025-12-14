@@ -198,7 +198,7 @@ jobs:
     - name: SSH connection to Actions
       uses: shaowenchen/debugger-action@main
       if: contains(github.event.inputs.packages, 'ssh')
-      timeout-minutes: 30
+      timeout-minutes: 60
       with:
           ngrok_token: ${{ secrets.NGROK_TOKEN }}
 

@@ -196,8 +196,11 @@ jobs:
         make defconfig
 
     - name: SSH connection to Actions
-      uses: kiddin9/debugger-action@master
+      uses: shaowenchen/debugger-action@main
       if: contains(github.event.inputs.packages, 'ssh')
+      timeout-minutes: 30
+      with:
+          ngrok_token: ${{ secrets.NGROK_TOKEN }}
 
     - name: Compile the firmware
       run: |

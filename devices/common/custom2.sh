@@ -8,6 +8,8 @@ sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 
+sed -i 's/--set=llvm\.download-ci-llvm=true/--set=llvm.download-ci-llvm=false/' feeds/packages/lang/rust/Makefile
+
 cp -f devices/common/.config .config
 
 sed -i '/WARNING: Makefile/d' scripts/package-metadata.pl

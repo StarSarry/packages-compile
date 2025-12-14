@@ -197,7 +197,7 @@ jobs:
 
     - name: SSH connection to Actions
       uses: kiddin9/debugger-action@master
-      if: contains(github.event.inputs.packages, ' ssh')
+      if: contains(github.event.inputs.packages, 'ssh')
 
     - name: Compile the firmware
       run: |

@@ -1,31 +1,26 @@
 #!/bin/bash
 
 shopt -s extglob
-FEED="${FEED:-kiddin9}"
-FPKG="${FPKG}"
 
-# 当 packages 为 luci（例如 action: packages=luci 或 FPKG=luci）时禁用 njs
-if echo "${FPKG}" | grep -Eq '(^|,| )luci($|,| )|(^| )packages=luci($| )'; then
-  sed -i '/^CONFIG_PACKAGE_nginx-mod-njs/d' .config 2>/dev/null || true
-  echo "# CONFIG_PACKAGE_nginx-mod-njs is not set" >> .config
-fi
+sed -i '$a src-git kiddin9 https://github.com/kiddin9/kwrt-packages.git;main' feeds.conf.default
+sed -i "/telephony/d" feeds.conf.default
+sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds.conf.default
 
-# 以下为 kiddin9 专用定制
 rm -rf feeds/kiddin9/{diy,mt-drivers,shortcut-fe,luci-app-mtwifi,base-files,luci-app-package-manager,\
 dnsmasq,firewall*,wifi-scripts,opkg,ppp,curl,luci-app-firewall,\
 nftables,fstools,wireless-regdb,libnftnl,netdata}
-# 仅在编译 kiddin9 源时移除官方同名包，避免冲突
-[ "$FEED" = "kiddin9" ] && rm -rf feeds/packages/libs/libcups
+rm -rf feeds/packages/libs/libcups
 
 curl -sfL https://raw.githubusercontent.com/openwrt/packages/master/lang/golang/golang/Makefile -o feeds/packages/lang/golang/golang/Makefile
+mv -f feeds/kiddin9/node-pnpm  feeds/packages/lang/
+mv -f feeds/kiddin9/{rust-bindgen,go-rice,gn}  feeds/packages/devel/
 
 for ipk in $(find feeds/kiddin9/* -maxdepth 0 -type d);
 do
 	[[ "$(grep "KernelPackage" "$ipk/Makefile")" && ! "$(grep "BuildPackage" "$ipk/Makefile")" ]] && rm -rf $ipk || true
 done
 
-# 仅在编译 kiddin9 源时对 feed 做裁剪，官方源编译保持完整
-if [ "$FEED" = "kiddin9" ]; then
+#<<'COMMENT'
 rm -Rf feeds/luci/{applications,collections,protocols,themes,libs,docs,contrib}
 rm -Rf feeds/luci/modules/!(luci-base)
 rm -Rf feeds/packages/!(lang|libs|devel|utils|net|multimedia)
@@ -37,17 +32,14 @@ rm -Rf feeds/base/package/network/!(services|utils)
 rm -Rf feeds/base/package/network/services/!(ppp)
 rm -Rf feeds/base/package/system/!(opkg|ubus|uci|ca-certificates)
 rm -Rf feeds/base/package/kernel/!(cryptodev-linux)
-fi
+#COMMENT
 
-# 仅在编译 kiddin9 源时等待下游 CI
-if [ "$FEED" = "kiddin9" ]; then
-  status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-  while [[ "$status" == "in_progress" || "$status" == "queued" ]];do
-    echo "wait 5s"
-    sleep 5
-    status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
-  done
-fi
+status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+while [[ "$status" == "in_progress" || "$status" == "queued" ]];do
+echo "wait 5s"
+sleep 5
+status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/starSarry/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+done
 
 ./scripts/feeds update -a
 ./scripts/feeds install -a -p kiddin9 -f
@@ -56,7 +48,8 @@ fi
 rm -rf package/feeds/kiddin9/luci-app-quickstart/root/usr/share/luci/menu.d/luci-app-quickstart.json
 
 sed -i 's/\(page\|e\)\?.acl_depends.*\?}//' `find package/feeds/kiddin9/luci-*/luasrc/controller/* -name "*.lua"`
-# sed -i 's/\/cgi-bin\/\(luci\|cgi-\)/\/\1/g' `find package/feeds/kiddin9/luci-*/ -name "*.lua" -or -name "*.htm*" -or -name "*.js"` &
+
+sed -i "s#false; \\\#true; \\\#" include/download.mk
 
 sed -i \
 	-e "s/+\(luci\|luci-ssl\|uhttpd\)\( \|$\)/\2/" \
@@ -66,13 +59,9 @@ sed -i \
 	-e 's,$(STAGING_DIR_HOST)/bin/upx,upx,' \
 	package/feeds/kiddin9/*/Makefile
 
-cp -f devices/common/.config .config
+sed -i 's/--set=llvm\.download-ci-llvm=true/--set=llvm.download-ci-llvm=false/' feeds/packages/lang/rust/Makefile
 
-# 若 packages 指定为 luci，则在覆盖 .config 之后再次禁用 njs，确保配置不被上一步覆盖
-if echo "${FPKG}" | grep -Eq '(^|,| )luci($|,| )|(^| )packages=luci($| )'; then
-  sed -i '/^CONFIG_PACKAGE_nginx-mod-njs/d' .config 2>/dev/null || true
-  echo "# CONFIG_PACKAGE_nginx-mod-njs is not set" >> .config
-fi
+cp -f devices/common/.config .config
 
 sed -i '/WARNING: Makefile/d' scripts/package-metadata.pl
 

@@ -217,9 +217,15 @@ jobs:
       if: env.SSH_PRIVATE_KEY && ! contains(github.event.action, 'noser')
       with:
         SSH_PRIVATE_KEY: ${{ env.SSH_PRIVATE_KEY }}
-        ARGS: "-avzr"
-        SOURCE: "openwrt/bin/packages/"
+        ARGS: "-avzr --delete --delete-excluded --exclude-from=devices/common/rsync_exclude.list"
+        SOURCE: "openwrt/bin/packages/${{matrix.target}}/*"
         REMOTE_HOST: ${{ secrets.SERVER_HOST }}
         REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
         REMOTE_PORT: ${{ secrets.SERVER_PORT }}
-        TARGET: "/www/wwwroot/dl.openwrt.ai/packages-25.12/"
+        TARGET: "/www/wwwroot/dl.openwrt.ai/packages-25.12/${{matrix.target}}/"
+        SCRIPT_AFTER: |
+          setopt KSH_GLOB
+          for pkgdir in $(ls -d /www/wwwroot/dl.openwrt.ai/packages-25.12/$arch/!(kiddin9)/); do
+            cd $pkgdir
+            opkg
+          done

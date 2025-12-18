@@ -206,7 +206,7 @@ jobs:
       run: |
         cd openwrt
           echo -e "$(($(nproc)+1)) thread compile"
-          make -j$(($(nproc)+1)) -k || df -hT"
+          make -j$(($(nproc)+1)) -k || df -hT
         echo "status=success" >> $GITHUB_ENV
 
     - name: Check space usage

@@ -66,7 +66,7 @@ jobs:
     - name: Free disk space
       uses: coder-xiaomo/free-disk-space@main
       with:
-        tool-cache: false
+        tool-cache: true
         android: true
         dotnet: true
         haskell: true
@@ -136,8 +136,9 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo mkdir -p -m 777 openwrt /mnt/openwrt/staging_dir /mnt/openwrt/build_dir /mnt/openwrt/bin  /mnt/openwrt/dl
+        sudo mkdir -p -m 777 openwrt openwrt/hostpkg /mnt/openwrt/staging_dir /mnt/openwrt/build_dir /mnt/openwrt/bin  /mnt/openwrt/dl
           ln -sf /mnt/openwrt/build_dir openwrt/build_dir
+          ln -sf openwrt/hostpkg /mnt/openwrt/build_dir/
         df -hT
     
     - name: Load custom configuration

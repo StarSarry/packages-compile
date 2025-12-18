@@ -216,7 +216,7 @@ jobs:
       if: env.SSH_PRIVATE_KEY && ! contains(github.event.action, 'noser')
       with:
         SSH_PRIVATE_KEY: ${{ env.SSH_PRIVATE_KEY }}
-        ARGS: "-avzr --exclude-from=devices/common/rsync_exclude.list"
+        ARGS: "-avzr --delete --delete-excluded --exclude-from=devices/common/rsync_exclude.list"
         SOURCE: "openwrt/bin/packages/${{matrix.target}}/*"
         REMOTE_HOST: ${{ secrets.SERVER_HOST }}
         REMOTE_USER: ${{ secrets.SERVER_USERNAME }}

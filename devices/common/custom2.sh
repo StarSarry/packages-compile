@@ -10,6 +10,7 @@ sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds
 ./scripts/feeds install -a
 
 sed -i 's/--set=llvm\.download-ci-llvm=true/--set=llvm.download-ci-llvm=false/' feeds/packages/lang/rust/Makefile
+rm -rf package/feeds/packages/{netdata,cloudreve,smartdns,dockerd,tessdata,telegraf,oci-runtime-tools,micropython,frp}
 
 cp -f devices/common/.config .config
 

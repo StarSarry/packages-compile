@@ -3,7 +3,7 @@
 shopt -s extglob
 
 sed -i "/telephony/d" feeds.conf.default
-sed -i "/video/d" feeds.conf.default
+sed -i "/packages/d" feeds.conf.default
 sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds.conf.default
 
 ./scripts/feeds update -a

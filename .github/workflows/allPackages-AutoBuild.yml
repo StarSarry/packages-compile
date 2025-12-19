@@ -211,10 +211,9 @@ jobs:
           for ipk in $(ls package/feeds/packages/); do
           make -k package/$ipk/compile -j$(($(nproc)+1)) || true
           done
-          shopt -s extglob
-          rm -rf bin/packages/*/!(packages)
+          rm -rf bin/packages/*/{base,luci,routing,video}
         else
-          echo -e "$(($(nproc)+1)) thread compile
+          echo -e "$(($(nproc)+1)) thread compile"
           make -j$(($(nproc)+1)) -k || true
         echo "status=success" >> $GITHUB_ENV
         fi

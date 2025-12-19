@@ -189,7 +189,6 @@ jobs:
         if [ -n "$(ls -A "devices/${{matrix.target}}/patches" 2>/dev/null)" ]; then
           find "devices/${{matrix.target}}/patches" -type f -name '*.patch' -print0 | sort -z | xargs -I % -t -0 -n 1 sh -c "cat '%'  | patch -d './' -p1 -E --forward --no-backup-if-mismatch"
         fi
-        sed -i 's/--set=llvm\.download-ci-llvm=true/--set=llvm.download-ci-llvm=false/' feeds/packages/lang/rust/Makefile
         cp -Rf ./diy/* ./ || true
         if [ -f "devices/${{matrix.target}}/.config" ]; then
           echo >> .config
@@ -209,13 +208,13 @@ jobs:
       run: |
         cd openwrt
         if [[ "$(echo "${{github.event.inputs.packages}}" | grep "pkgs")" ]]; then
+          sed -i 's/--set=llvm\.download-ci-llvm=true/--set=llvm.download-ci-llvm=false/' feeds/packages/lang/rust/Makefile
           for ipk in $(ls package/feeds/packages/); do
           make -k package/$ipk/compile -j$(($(nproc)+1)) || true
           done
           rm -rf bin/packages/*/{base,luci,routing,video}
         else
           echo -e "$(($(nproc)+1)) thread compile"
-          rm -rf package/feeds/packages
           make -j$(($(nproc)+1)) -k || true
         echo "status=success" >> $GITHUB_ENV
         fi

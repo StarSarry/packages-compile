@@ -214,7 +214,7 @@ jobs:
           shopt -s extglob
           rm -rf bin/packages/*/!(packages)
         else
-          echo -e "$(($(nproc)+1)) thread compile"
+          echo -e "$(($(nproc)+1)) thread compile
           make -j$(($(nproc)+1)) -k || true
         echo "status=success" >> $GITHUB_ENV
         fi

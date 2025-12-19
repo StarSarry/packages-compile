@@ -197,14 +197,6 @@ jobs:
         fi
         make defconfig
 
-    - name: Cache
-      uses: stupidloud/cachewrtbuild@main
-      with:
-        ccache: 'true'
-        mixkey: ${{ matrix.target }}
-        clean: ${{ contains(github.event.action, 'nocache') }}
-        prefix: ${{ github.workspace }}/openwrt
-
     - name: SSH connection to Actions
       uses: shaowenchen/debugger-action@main
       if: contains(github.event.inputs.packages, 'ssh')
@@ -217,15 +209,13 @@ jobs:
       run: |
         cd openwrt
         if [[ "$(echo "${{github.event.inputs.packages}}" | grep "pkgs")" ]]; then
-          mv -f package/feeds/packages packages.b
-          mkdir package/feeds/packages
-          cp -rf kiddin9/{
           for ipk in $(ls package/feeds/packages/); do
           make -k package/$ipk/compile -j$(($(nproc)+1)) || true
           done
           rm -rf bin/packages/*/{base,luci,routing,video}
         else
           echo -e "$(($(nproc)+1)) thread compile"
+          rm -rf package/feeds/packages
           make -j$(($(nproc)+1)) -k || true
         echo "status=success" >> $GITHUB_ENV
         fi
@@ -245,8 +235,7 @@ jobs:
         REMOTE_PORT: ${{ secrets.SERVER_PORT }}
         TARGET: "/www/wwwroot/dl.openwrt.ai/packages-25.12/${{matrix.target}}/"
         SCRIPT_AFTER: |
-          setopt KSH_GLOB
-          for pkgdir in $(ls -d /www/wwwroot/dl.openwrt.ai/packages-25.12/$arch/!(kiddin9)/); do
+          for pkgdir in $(ls -d /www/wwwroot/dl.openwrt.ai/packages-25.12/$arch/{base,luci,routing,video}/); do
             cd $pkgdir
             opkg
           done

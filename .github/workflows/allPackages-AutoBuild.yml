@@ -209,7 +209,7 @@ jobs:
         cd openwrt
         if [[ "$(echo "${{github.event.action}}" | grep "pkgs")" ]]; then
           for ipk in $(ls package/feeds/packages/); do
-          (make -k package/$ipk/compile -j$(($(nproc)+1)) || make package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || rm -rf error_$ipk.log) || true
+          make -k package/$ipk/compile -j$(($(nproc)+1)) || true
           done
         else
           echo -e "$(($(nproc)+1)) thread compile"

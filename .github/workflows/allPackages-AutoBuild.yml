@@ -196,6 +196,14 @@ jobs:
         fi
         make defconfig
 
+    - name: Cache
+      uses: stupidloud/cachewrtbuild@main
+      with:
+        ccache: 'true'
+        mixkey: ${{ matrix.target }}
+        clean: ${{ contains(github.event.action, 'nocache') }}
+        prefix: ${{ github.workspace }}/openwrt
+
     - name: SSH connection to Actions
       uses: shaowenchen/debugger-action@main
       if: contains(github.event.inputs.packages, 'ssh')
@@ -208,6 +216,9 @@ jobs:
       run: |
         cd openwrt
         if [[ "$(echo "${{github.event.inputs.packages}}" | grep "pkgs")" ]]; then
+          mv -f package/feeds/packages packages.b
+          mkdir package/feeds/packages
+          cp -rf kiddin9/{
           for ipk in $(ls package/feeds/packages/); do
           make -k package/$ipk/compile -j$(($(nproc)+1)) || true
           done

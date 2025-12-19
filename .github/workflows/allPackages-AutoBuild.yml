@@ -211,6 +211,8 @@ jobs:
           for ipk in $(ls package/feeds/packages/); do
           make -k package/$ipk/compile -j$(($(nproc)+1)) || true
           done
+          shopt -s extglob
+          rm -rf bin/packages/*/!(packages)
         else
           echo -e "$(($(nproc)+1)) thread compile"
           make -j$(($(nproc)+1)) -k || true

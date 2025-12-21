@@ -2,6 +2,8 @@
 
 shopt -s extglob
 
+sed -i '/^config PACKAGE_kmod-/{N;/\n[[:space:]]*tristate/{N;s/default[[:space:]]*m/default n/;}}' Config-build.in
+
 sed -i '$a src-git kiddin9 https://github.com/kiddin9/kwrt-packages.git;main' feeds.conf.default
 sed -i "/telephony/d" feeds.conf.default
 sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds.conf.default
@@ -27,11 +29,6 @@ rm -Rf feeds/packages/!(lang|libs|devel|utils|net|multimedia)
 rm -Rf feeds/packages/libs/gnutls
 rm -Rf feeds/packages/multimedia/!(gstreamer1)
 rm -Rf feeds/packages/net/!(mosquitto|curl)
-rm -Rf feeds/base/package/firmware
-rm -Rf feeds/base/package/network/!(services|utils)
-rm -Rf feeds/base/package/network/services/!(ppp)
-rm -Rf feeds/base/package/system/!(opkg|ubus|uci|ca-certificates)
-rm -Rf feeds/base/package/kernel/!(cryptodev-linux)
 #COMMENT
 
 status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/kiddin9/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')

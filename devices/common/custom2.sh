@@ -11,7 +11,7 @@ sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds
 
 rm -rf package/feeds/packages/{netdata,cloudreve,smartdns,vsftpd,p910nd,aria2,ariang,coremark,watchcat,dockerd,frp}
 
-rm -Rf feeds/base_root/package/kernel/!(cryptodev-linux)
+rm -Rf feeds/base_root/package/kernel/!(cryptodev-linux|bpf-headers)
 
 cp -f devices/common/.config .config
 

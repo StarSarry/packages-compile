@@ -31,6 +31,11 @@ rm -Rf feeds/packages/!(lang|libs|devel|utils|net|multimedia)
 rm -Rf feeds/packages/libs/gnutls
 rm -Rf feeds/packages/multimedia/!(gstreamer1)
 rm -Rf feeds/packages/net/!(mosquitto|curl)
+rm -Rf feeds/base_root/package/firmware
+rm -Rf feeds/base_root/package/network/!(services|utils)
+rm -Rf feeds/base_root/package/network/services/!(ppp)
+rm -Rf feeds/base_root/package/system/!(opkg|ubus|uci|ca-certificates)
+rm -Rf feeds/base_root/package/kernel/!(cryptodev-linux)
 #COMMENT
 
 status=$(curl -H "Authorization: token $REPO_TOKEN" -s "https://api.github.com/repos/kiddin9/kwrt-packages/actions/runs" | jq -r '.workflow_runs[0].status')

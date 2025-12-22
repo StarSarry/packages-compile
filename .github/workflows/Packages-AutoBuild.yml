@@ -168,11 +168,12 @@ jobs:
           cd $rootdir
           }
         export -f git_clone_path
-        tar -xf sdk.tar.zst -C openwrt --strip-components=1 --skip-old-files
-        rm -rf sdk.tar.zst
+        tar -xJf sdk.tar.zst -C openwrt || tar -xf sdk.tar.zst -C openwrt
         cd openwrt
+        cp -rf ./openwrt-sdk*/. ./ 2>/dev/null || true
         cp -rf ./openwrt-sdk*/build_dir/. ./build_dir/ || true
         cp -rf ./openwrt-sdk*/staging_dir/. ./staging_dir/ || true
+        rm -rf openwrt-sdk* ../sdk.tar.zst
         cp -rf ../devices ./
         cp -rf devices/common/. ./
         cp -rf devices/${{matrix.target}}/. ./

@@ -2,8 +2,6 @@
 
 shopt -s extglob
 
-sed -i '/^config PACKAGE_kmod-/{N;/\n[[:space:]]*tristate/{N;s/default[[:space:]]*m/default n/;}}' Config-build.in
-
 sed -i '$a src-git kiddin9 https://github.com/kiddin9/kwrt-packages.git;main' feeds.conf.default
 sed -i "/telephony/d" feeds.conf.default
 sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds.conf.default

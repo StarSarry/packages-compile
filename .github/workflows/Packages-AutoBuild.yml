@@ -98,39 +98,39 @@ jobs:
     - name: Clone source code
       run: |
         set -v
-        REPO_BRANCH="24.10-SNAPSHOT"
+        REPO_BRANCH="25.12-SNAPSHOT"
         #REPO_BRANCH="$(curl -gs -H 'Content-Type: application/json' \
         #   -H "Authorization: Bearer ${{ secrets.TOKEN_KIDDIN9 }}" \
         #   -X POST -d '{ "query": "query {repository(owner: \"openwrt\", name: \"openwrt\") {refs(refPrefix: \"refs/tags/\", last: 4, orderBy: {field: TAG_COMMIT_DATE, direction: ASC}) {edges {node {name}}}}}"}' https://api.github.com/graphql | jq -r '.data.repository.refs.edges[].node.name' | grep v23 | tail -n 1 | sed -e 's/v//')" || true
         echo "$REPO_BRANCH"
         if [ ${{matrix.target}} == "mipsel_24kc" ]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ramips/mt7621/openwrt-sdk-$REPO_BRANCH-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ramips/mt7621/openwrt-sdk-$REPO_BRANCH-ramips-mt7621_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         elif [ ${{matrix.target}} == "mips_24kc" ]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ath79/nand/openwrt-sdk-$REPO_BRANCH-ath79-nand_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ath79/nand/openwrt-sdk-$REPO_BRANCH-ath79-nand_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "x86_64" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/x86/64/openwrt-sdk-$REPO_BRANCH-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/x86/64/openwrt-sdk-$REPO_BRANCH-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "i386_pentium4" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/x86/generic/openwrt-sdk-$REPO_BRANCH-x86-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/x86/generic/openwrt-sdk-$REPO_BRANCH-x86-generic_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "aarch64_generic" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/rockchip/armv8/openwrt-sdk-$REPO_BRANCH-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/rockchip/armv8/openwrt-sdk-$REPO_BRANCH-rockchip-armv8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "arm_arm1176jzf-s_vfp" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm27xx/bcm2708/openwrt-sdk-$REPO_BRANCH-bcm27xx-bcm2708_gcc-13.3.0_musl_eabi.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm27xx/bcm2708/openwrt-sdk-$REPO_BRANCH-bcm27xx-bcm2708_gcc-14.3.0_musl_eabi.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "arm_cortex-a15_neon-vfpv4" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ipq806x/generic/openwrt-sdk-$REPO_BRANCH-ipq806x-generic_gcc-13.3.0_musl_eabi.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ipq806x/generic/openwrt-sdk-$REPO_BRANCH-ipq806x-generic_gcc-14.3.0_musl_eabi.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "arm_cortex-a5_vfpv4" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/at91/sama5/openwrt-sdk-$REPO_BRANCH-at91-sama5_gcc-13.3.0_musl_eabi.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/at91/sama5/openwrt-sdk-$REPO_BRANCH-at91-sama5_gcc-14.3.0_musl_eabi.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "aarch64_cortex-a72" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm27xx/bcm2711/openwrt-sdk-$REPO_BRANCH-bcm27xx-bcm2711_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm27xx/bcm2711/openwrt-sdk-$REPO_BRANCH-bcm27xx-bcm2711_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "aarch64_cortex-a53" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/mediatek/filogic/openwrt-sdk-$REPO_BRANCH-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/mediatek/filogic/openwrt-sdk-$REPO_BRANCH-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "arm_cortex-a7_neon-vfpv4" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ipq40xx/generic/openwrt-sdk-$REPO_BRANCH-ipq40xx-generic_gcc-13.3.0_musl_eabi.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/ipq40xx/generic/openwrt-sdk-$REPO_BRANCH-ipq40xx-generic_gcc-14.3.0_musl_eabi.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "arm_cortex-a9" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm53xx/generic/openwrt-sdk-$REPO_BRANCH-bcm53xx-generic_gcc-13.3.0_musl_eabi.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm53xx/generic/openwrt-sdk-$REPO_BRANCH-bcm53xx-generic_gcc-14.3.0_musl_eabi.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "arm_cortex-a9_vfpv3-d16" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/mvebu/cortexa9/openwrt-sdk-$REPO_BRANCH-mvebu-cortexa9_gcc-13.3.0_musl_eabi.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/mvebu/cortexa9/openwrt-sdk-$REPO_BRANCH-mvebu-cortexa9_gcc-14.3.0_musl_eabi.Linux-x86_64.tar.zst
         elif [[ ${{matrix.target}} == "aarch64_cortex-a76" ]]; then
-            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm27xx/bcm2712/openwrt-sdk-$REPO_BRANCH-bcm27xx-bcm2712_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            wget -c -O sdk.tar.zst https://mirror-03.infra.openwrt.org/releases/$REPO_BRANCH/targets/bcm27xx/bcm2712/openwrt-sdk-$REPO_BRANCH-bcm27xx-bcm2712_gcc-14.3.0_musl.Linux-x86_64.tar.zst
         fi
 
     - name: Free up disk space
@@ -346,7 +346,7 @@ jobs:
         REMOTE_HOST: ${{ secrets.SERVER_HOST }}
         REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
         REMOTE_PORT: ${{ secrets.SERVER_PORT }}
-        TARGET: "/www/wwwroot/dl.openwrt.ai/releases/24.10/packages/${{matrix.target}}/kiddin9/"
+        TARGET: "/www/wwwroot/dl.openwrt.ai/releases/25.12/packages/${{matrix.target}}/kiddin9/"
         SCRIPT_AFTER: |
             bash opkg ${{matrix.target}} &
 

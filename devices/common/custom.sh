@@ -4,6 +4,7 @@ shopt -s extglob
 
 sed -i '$a src-git kiddin9 https://github.com/StarSarry/kwrt-packages.git;main' feeds.conf.default
 sed -i "/telephony/d" feeds.conf.default
+sed -i "/routing/d" feeds.conf.default
 sed -i -E "s#git\.openwrt\.org/(openwrt|feed|project)#github.com/openwrt#" feeds.conf.default
 sed -i '/	refresh_config();/d' scripts/feeds
 
@@ -28,7 +29,7 @@ rm -Rf feeds/luci/{applications,collections,protocols,themes,libs,docs,contrib}
 rm -Rf feeds/luci/modules/!(luci-base)
 rm -Rf feeds/packages/!(lang|libs|devel|utils|net|multimedia)
 rm -Rf feeds/packages/multimedia/!(gstreamer1)
-rm -Rf feeds/packages/net/!(mosquitto|curl)
+rm -Rf feeds/packages/net/!(mosquitto|curl|unbound)
 rm -Rf feeds/base_root/package/firmware
 rm -Rf feeds/base_root/package/network/!(services|utils)
 rm -Rf feeds/base_root/package/network/services/!(ppp)

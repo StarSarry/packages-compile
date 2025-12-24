@@ -8,7 +8,7 @@
 
 name: Repo Dispatcher
 
-on: 
+on:
   # push: 
   #   branches:
   #     - master
@@ -38,7 +38,7 @@ jobs:
       with:
         workflow_id: all
         access_token: ${{ secrets.TOKEN_KIDDIN9 }}
-    
+
     - name: Trigger matrix Update
       run: |
         gitdate=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/kwrt-packages/commits?&per_page=1" | jq -r '.[0].commit.committer.date') || true

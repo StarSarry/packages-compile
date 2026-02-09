@@ -15,8 +15,6 @@ dnsmasq,firewall*,wifi-scripts,opkg,ppp,curl,luci-app-firewall,\
 nftables,fstools,wireless-regdb,libnftnl,netdata}
 rm -rf feeds/packages/libs/libcups
 
-curl -sfL https://github.com/sbwml/packages_lang_golang/raw/refs/heads/26.x/golang/Makefile -o feeds/packages/lang/golang/golang/Makefile
-
 mv -f feeds/kiddin9/{rust-bindgen,go-rice,gn}  feeds/packages/devel/
 
 for ipk in $(find feeds/kiddin9/* -maxdepth 0 -type d);

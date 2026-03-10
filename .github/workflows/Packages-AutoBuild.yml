@@ -203,10 +203,10 @@ jobs:
           echo >> .config
           cat devices/${{matrix.target}}/.config >> .config
         fi
-        status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/kiddin9/op-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+        status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/op-packages/actions/runs" | jq -r '.workflow_runs[0].status')
         while [ "$status" == "in_progress" ];do
           sleep 5
-          status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/kiddin9/op-packages/actions/runs" | jq -r '.workflow_runs[0].status')
+          status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/op-packages/actions/runs" | jq -r '.workflow_runs[0].status')
         done
         make defconfig
 
@@ -243,7 +243,7 @@ jobs:
             else
               REPO_TOKEN="${{ env.REPO_TOKEN }}"
               for token in "$REPO_TOKEN" "${{ secrets.TEMPGITHUBK }}" "${{ secrets.TOKEN_KIDDIN9 }}"; do
-                if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/kiddin9/op-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
+                if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/StarSarry/op-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
                   success=true
                   break
                 fi
@@ -301,6 +301,7 @@ jobs:
         REMOTE_HOST: ${{ secrets.SERVER_HOST }}
         REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
         REMOTE_PORT: ${{ secrets.SERVER_PORT }}
+        SCRIPT_BEFORE: mkdir -p /www/wwwroot/dl.openwrt.ai/releases/25.12/packages/${{matrix.target}}/kiddin9
         TARGET: "/www/wwwroot/dl.openwrt.ai/releases/25.12/packages/${{matrix.target}}/kiddin9/"
         SCRIPT_AFTER: |
             bash opkg ${{matrix.target}} &

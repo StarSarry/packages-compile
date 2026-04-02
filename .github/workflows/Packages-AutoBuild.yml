@@ -208,6 +208,11 @@ jobs:
           status=$(curl -H "Authorization: token ${{ env.REPO_TOKEN }}" -s "https://api.github.com/repos/StarSarry/op-packages/actions/runs" | jq -r '.workflow_runs[0].status')
         done
         make defconfig
+        if grep -q '^CONFIG_USE_APK=y' .config; then
+          echo "PKG_FORMAT=apk" >> $GITHUB_ENV
+        else
+          echo "PKG_FORMAT=ipk" >> $GITHUB_ENV
+        fi
 
     - name: SSH connection to Actions
       uses: kiddin9/debugger-action@master
@@ -224,25 +229,25 @@ jobs:
       run: |
         cd openwrt
           echo -e "$(($(nproc)+1)) thread compile"
-          fpkg="$(echo "${{github.event.action}}" | sed -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\|riscv64_generic\| [0-9][0-9.]*\| ssh\| noser\| cw\| all\| lang\)//g' | sed -e 's/ //g')"
-          echo "FPKG=$fpkg" >> $GITHUB_ENV
+          pkg_filter="$(echo "${{github.event.action}}" | sed -e 's/\(aarch64_generic\|x86_64\|i386_pentium4\|arm_arm1176jzf-s_vfp\|aarch64_cortex-a72\|aarch64_cortex-a76\|arm_cortex-a7\|arm_cortex-a7_neon-vfpv4\|arm_cortex-a9\|arm_cortex-a15_neon-vfpv4\|arm_cortex-a5_vfpv4\|mipsel_24kc\|mips_24kc\|aarch64_cortex-a53\|arm_xscale\|arm_cortex-a9_vfpv3-d16\|riscv64_generic\| [0-9][0-9.]*\| ssh\| noser\| cw\| all\| lang\)//g' | sed -e 's/ //g')"
+          echo "PKG_FILTER=$pkg_filter" >> $GITHUB_ENV
           during="$(echo "${{github.event.action}}" | grep -o -E ' [0-9][0-9.]*' | sed -e 's/ //')"
           function comp(){
-             echo "compile $ipk"
-             cp -rf kiddin9.b/$ipk* package/feeds/kiddin9/
-             if [[ $ipk != luci-app-* ]]; then
-             make -k package/$ipk/compile -j$(($(nproc)+1)) || (make -k package/$ipk/compile V=s 2>&1 | tee error_$ipk.log | grep -i "Error 2" || true)
+             echo "compile $pkg"
+             cp -rf kiddin9.b/$pkg* package/feeds/kiddin9/
+             if [[ $pkg != luci-app-* ]]; then
+             make -k package/$pkg/compile -j$(($(nproc)+1)) || (make -k package/$pkg/compile V=s 2>&1 | tee error_$pkg.log | grep -i "Error 2" || true)
              else
-             make -k -i package/$ipk/compile -j$(($(nproc)+1))
+             make -k -i package/$pkg/compile -j$(($(nproc)+1))
              fi
             }
-          for ipk in $(ls kiddin9.b | grep -E "$fpkg"); do
-            if [[ "$fpkg" && "$ipk" && ! "$during" ]]; then
+          for pkg in $(ls kiddin9.b | grep -E "$pkg_filter"); do
+            if [[ "$pkg_filter" && "$pkg" && ! "$during" ]]; then
               comp
             else
               REPO_TOKEN="${{ env.REPO_TOKEN }}"
               for token in "$REPO_TOKEN" "${{ secrets.TEMPGITHUBK }}" "${{ secrets.TOKEN_KIDDIN9 }}"; do
-                if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/StarSarry/op-packages/commits?path=$ipk&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
+                if [ -n "$token" ] && gitdate=$(curl -H "Authorization: token $token" -s "https://api.github.com/repos/StarSarry/op-packages/commits?path=$pkg&per_page=1" | jq -r '.[0].commit.committer.date') && [ "$gitdate" != "null" ]; then
                   success=true
                   break
                 fi
@@ -256,15 +261,15 @@ jobs:
                 now="$(date -d "$(date)" +%s)"
                 [ "$during" ] || during="1.05"
                 durings=`echo "$during*60*60*24" | bc`
-                if [[ $(($gitdate + ${durings%.*})) -gt $now && $ipk != luci-base ]]; then
+                if [[ $(($gitdate + ${durings%.*})) -gt $now && $pkg != luci-base ]]; then
                   echo "$((($now - $gitdate)/60/60))" || true
-                  echo "$ipk" >> ipk.txt
+                  echo "$pkg" >> pkg.txt
                 fi
               fi
             fi
           done
-          if [ -f ipk.txt ]; then
-              for ipk in $(cat ipk.txt)
+          if [ -f pkg.txt ]; then
+              for pkg in $(cat pkg.txt)
               do
                 comp
               done
@@ -303,7 +308,11 @@ jobs:
         SCRIPT_BEFORE: mkdir -p /www/wwwroot/dl.openwrt.ai/releases/25.12/packages/${{matrix.target}}/kiddin9
         TARGET: "/www/wwwroot/dl.openwrt.ai/releases/25.12/packages/${{matrix.target}}/kiddin9/"
         SCRIPT_AFTER: |
-          bash opkg ${{matrix.target}} &
+          if [ "${{ env.PKG_FORMAT }}" = "apk" ]; then
+            bash apk ${{matrix.target}} || bash opkg ${{matrix.target}}
+          else
+            bash opkg ${{matrix.target}} || bash apk ${{matrix.target}}
+          fi &
 
     - name: Create release
       id: create_release

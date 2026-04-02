@@ -17,9 +17,9 @@ rm -rf feeds/packages/libs/libcups
 
 mv -f feeds/kiddin9/{rust-bindgen,go-rice,gn}  feeds/packages/devel/
 
-for ipk in $(find feeds/kiddin9/* -maxdepth 0 -type d);
+for pkg in $(find feeds/kiddin9/* -maxdepth 0 -type d);
 do
-	[[ "$(grep "KernelPackage" "$ipk/Makefile")" && ! "$(grep "BuildPackage" "$ipk/Makefile")" ]] && rm -rf $ipk || true
+	[[ "$(grep "KernelPackage" "$pkg/Makefile")" && ! "$(grep "BuildPackage" "$pkg/Makefile")" ]] && rm -rf $pkg || true
 done
 
 #<<'COMMENT'
@@ -33,7 +33,7 @@ rm -Rf feeds/packages/utils/!(tar|xz|docker|dockerd|containerd|zstd|unzip|acl|lm
 rm -Rf feeds/base_root/package/firmware
 rm -Rf feeds/base_root/package/network/!(services|utils)
 rm -Rf feeds/base_root/package/network/services/!(ppp)
-rm -Rf feeds/base_root/package/system/!(opkg|ubus|uci|ca-certificates)
+rm -Rf feeds/base_root/package/system/!(opkg|apk*|ubus|uci|ca-certificates)
 rm -Rf feeds/base_root/package/kernel/!(cryptodev-linux||bpf-headers|mac80211)
 #COMMENT
 
